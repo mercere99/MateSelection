@@ -36,6 +36,11 @@ struct pop_values {
     os << "male_TT = " << male_TT << "      ";
     os << "male_tT = " << male_tT << "      ";
     os << "male_tt = " << male_tt << "\n";
+    
+    // Genes
+    os << "P = " << (female_PTT + female_PtT + female_Ptt) << "  ";
+    os << "T = " << (male_TT + male_tT / 2) << "  ";
+    os << "t = " << (male_tt + male_tT / 2) << "\n";
   }
 
   void MinPrint(size_t ud, std::ostream & os = std::cout) {
@@ -62,14 +67,28 @@ struct pop_values {
 
   void Run(
 		  const size_t updates = 1,         // How long should this run for?
-		  const double female_gain = 0.05,   // s_f
+		  const double female_gain = 0.05,  // s_f
 		  const double male_harm = 0.5,     // s_m
 		  const double pref_level = 7.5,    // alpha
-		  const double dominance = 0.5      // h_T  (and h_f?)
+		  const double dominance = 0.5,     // h_T  (and h_f?)
+      const double t_mut_rate = 0.001,  // u ; Mutation rate t <-> T
+      const double p_mut_rate = 0.0     // not in paper ; Mutation rate p <-> P
 		) {
 
     // Extra calculations
     const double pref_level_het = pow(pref_level, dominance);
+
+    const double no_t_mut_rate = 1.0 - t_mut_rate;
+    const double no_p_mut_rate = 1.0 - p_mut_rate;
+
+    const double prob_xxx_mut = no_p_mut_rate * no_t_mut_rate * no_t_mut_rate;
+    const double prob_pxx_mut =    p_mut_rate * no_t_mut_rate * no_t_mut_rate;
+    const double prob_xtx_mut = no_p_mut_rate *    t_mut_rate * no_t_mut_rate;
+    const double prob_ptx_mut =    p_mut_rate *    t_mut_rate * no_t_mut_rate;
+    //const double prob_xxt_mut = no_p_mut_rate * no_t_mut_rate *    t_mut_rate;  // Duplicate of xtx
+    //const double prob_pxt_mut =    p_mut_rate * no_t_mut_rate *    t_mut_rate;  // Duplicate of ptx
+    const double prob_xtt_mut = no_p_mut_rate *    t_mut_rate *    t_mut_rate;
+    const double prob_ptt_mut =    p_mut_rate *    t_mut_rate *    t_mut_rate;
 
     // Determne the fitness of each genotype
     const double f_TT_fit = 1.0 + female_gain;
@@ -110,20 +129,47 @@ struct pop_values {
       double tt_pref_ratio = 1.0 / ave_pref_level;
 
       // Determine weight of each female in the next population.
-      next_pop.female_pTT = f_pT_weight * m_TT_weight + 
-                            f_pT_weight * m_tT_weight / 2.0;
-      next_pop.female_ptT = f_pt_weight * m_TT_weight + 
-                            f_p_weight  * m_tT_weight / 2.0 +
-                            f_pT_weight * m_tt_weight;
-      next_pop.female_ptt = f_pt_weight * m_tT_weight / 2.0 + 
-                            f_pt_weight * m_tt_weight;
-      next_pop.female_PTT = f_PT_weight * m_TT_weight * TT_pref_ratio + 
-                            f_PT_weight * m_tT_weight * tT_pref_ratio / 2.0;
-      next_pop.female_PtT = f_Pt_weight * m_TT_weight * TT_pref_ratio +
-                            f_P_weight  * m_tT_weight * tT_pref_ratio / 2.0 +
-                            f_PT_weight * m_tt_weight * tt_pref_ratio;
-      next_pop.female_Ptt = f_Pt_weight * m_tT_weight * tT_pref_ratio / 2.0 +
-                            f_Pt_weight * m_tt_weight * tt_pref_ratio;
+      double next_f_pTT = f_pT_weight * m_TT_weight + 
+                          f_pT_weight * m_tT_weight / 2.0;
+      double next_f_ptT = f_pt_weight * m_TT_weight + 
+                          f_p_weight  * m_tT_weight / 2.0 +
+                          f_pT_weight * m_tt_weight;
+      double next_f_ptt = f_pt_weight * m_tT_weight / 2.0 + 
+                          f_pt_weight * m_tt_weight;
+      double next_f_PTT = f_PT_weight * m_TT_weight * TT_pref_ratio + 
+                          f_PT_weight * m_tT_weight * tT_pref_ratio / 2.0;
+      double next_f_PtT = f_Pt_weight * m_TT_weight * TT_pref_ratio +
+                          f_P_weight  * m_tT_weight * tT_pref_ratio / 2.0 +
+                          f_PT_weight * m_tt_weight * tt_pref_ratio;
+      double next_f_Ptt = f_Pt_weight * m_tT_weight * tT_pref_ratio / 2.0 +
+                          f_Pt_weight * m_tt_weight * tt_pref_ratio;
+
+      // Now account for flow due to mutations!
+      next_pop.female_pTT = next_f_pTT * prob_xxx_mut + next_f_PTT * prob_pxx_mut +
+                            next_f_ptT * prob_xtx_mut + next_f_PtT * prob_ptx_mut + 
+                            next_f_ptt * prob_xtt_mut + next_f_Ptt * prob_ptt_mut;
+
+      next_pop.female_ptT = (next_f_pTT * prob_xtx_mut + next_f_PTT * prob_ptx_mut) * 2.0 +  // Either t can toggle
+                            next_f_ptT * prob_xxx_mut + next_f_PtT * prob_pxx_mut + 
+                            (next_f_ptt * prob_xtx_mut + next_f_Ptt * prob_ptx_mut) * 2.0 +
+                            next_f_ptT * prob_xtt_mut + next_f_PtT * prob_ptt_mut;           // BOTH t's can toggle
+
+      next_pop.female_ptt = next_f_pTT * prob_xtt_mut + next_f_PTT * prob_ptt_mut +
+                            next_f_ptT * prob_xtx_mut + next_f_PtT * prob_ptx_mut + 
+                            next_f_ptt * prob_xxx_mut + next_f_Ptt * prob_pxx_mut;
+
+      next_pop.female_PTT = next_f_pTT * prob_pxx_mut + next_f_PTT * prob_xxx_mut +
+                            next_f_ptT * prob_ptx_mut + next_f_PtT * prob_xtx_mut + 
+                            next_f_ptt * prob_ptt_mut + next_f_Ptt * prob_xtt_mut;
+
+      next_pop.female_PtT = (next_f_pTT * prob_ptx_mut + next_f_PTT * prob_xtx_mut) * 2.0 +
+                            next_f_ptT * prob_pxx_mut + next_f_PtT * prob_xxx_mut + 
+                            (next_f_ptt * prob_ptx_mut + next_f_Ptt * prob_xtx_mut) * 2.0 +
+                            next_f_ptT * prob_ptt_mut + next_f_PtT * prob_xtt_mut;
+
+      next_pop.female_Ptt = next_f_pTT * prob_ptt_mut + next_f_PTT * prob_xtt_mut +
+                            next_f_ptT * prob_ptx_mut + next_f_PtT * prob_xtx_mut + 
+                            next_f_ptt * prob_pxx_mut + next_f_Ptt * prob_xxx_mut;
 
       // Clean up results.
       next_pop.Normalize();
