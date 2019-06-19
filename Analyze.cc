@@ -62,9 +62,9 @@ struct pop_values {
 
   void Run(
 		  const size_t updates = 1,         // How long should this run for?
-		  const double female_gain = 0.1,   // s_f
-		  const double male_harm = 0.1,     // s_m
-		  const double pref_level = 2.0,    // alpha
+		  const double female_gain = 0.05,   // s_f
+		  const double male_harm = 0.5,     // s_m
+		  const double pref_level = 7.5,    // alpha
 		  const double dominance = 0.5      // h_T  (and h_f?)
 		) {
 
@@ -91,12 +91,17 @@ struct pop_values {
       double f_Ptt_weight = female_Ptt * f_tt_fit;  // Technically, just * 1.0
 
       // Determine the weight of particular gene combinations being inherited from the female.
-      double Pt_weight = f_PtT_weight / 2.0 + f_Ptt_weight;            // a
-      double P_weight  = f_PTT_weight + f_PtT_weight + f_Ptt_weight;   // b
-      double PT_weight = f_PTT_weight + f_PtT_weight / 2.0;            // c
-      double pt_weight = f_ptT_weight / 2.0 + f_ptt_weight;            // d
-      double p_weight  = f_pTT_weight + f_ptT_weight + f_ptt_weight;   // e
-      double pT_weight = f_pTT_weight + f_ptT_weight / 2.0;            // g
+      double f_Pt_weight = f_PtT_weight / 2.0 + f_Ptt_weight;            // a
+      double f_P_weight  = f_PTT_weight + f_PtT_weight + f_Ptt_weight;   // b
+      double f_PT_weight = f_PTT_weight + f_PtT_weight / 2.0;            // c
+      double f_pt_weight = f_ptT_weight / 2.0 + f_ptt_weight;            // d
+      double f_p_weight  = f_pTT_weight + f_ptT_weight + f_ptt_weight;   // e
+      double f_pT_weight = f_pTT_weight + f_ptT_weight / 2.0;            // g
+
+      // Determine the weight of each male genotype
+      double m_TT_weight = male_TT * m_TT_fit;
+      double m_tT_weight = male_tT * m_tT_fit;
+      double m_tt_weight = male_tt * m_tt_fit;
 
       // Determine how preferences help...
       double ave_pref_level = pref_level * male_TT + pref_level_het * male_tT + male_tt;
@@ -105,19 +110,20 @@ struct pop_values {
       double tt_pref_ratio = 1.0 / ave_pref_level;
 
       // Determine weight of each female in the next population.
-      next_pop.female_pTT = male_TT * m_TT_fit * pT_weight + 
-                            male_tT * m_tT_fit * pT_weight / 2.0;
-      next_pop.female_ptT = male_TT * m_TT_fit * pt_weight + 
-                            male_tT * m_tT_fit * p_weight / 2.0 +
-                            male_tt * pT_weight;
-      next_pop.female_ptt = male_tT * m_tT_fit * pt_weight / 2.0 + 
-                            male_tt * pt_weight;
-      next_pop.female_PTT = male_TT * m_TT_fit * PT_weight * TT_pref_ratio + 
-                            male_tT * m_tT_fit * PT_weight * tT_pref_ratio / 2.0;
-      next_pop.female_PtT = male_TT * m_TT_fit * Pt_weight * TT_pref_ratio +
-                            male_tT * m_tT_fit * P_weight * tT_pref_ratio / 2.0;
-      next_pop.female_Ptt = male_tT * m_tT_fit * Pt_weight * tT_pref_ratio / 2.0 +
-                            male_tt * Pt_weight * tt_pref_ratio;
+      next_pop.female_pTT = f_pT_weight * m_TT_weight + 
+                            f_pT_weight * m_tT_weight / 2.0;
+      next_pop.female_ptT = f_pt_weight * m_TT_weight + 
+                            f_p_weight  * m_tT_weight / 2.0 +
+                            f_pT_weight * m_tt_weight;
+      next_pop.female_ptt = f_pt_weight * m_tT_weight / 2.0 + 
+                            f_pt_weight * m_tt_weight;
+      next_pop.female_PTT = f_PT_weight * m_TT_weight * TT_pref_ratio + 
+                            f_PT_weight * m_tT_weight * tT_pref_ratio / 2.0;
+      next_pop.female_PtT = f_Pt_weight * m_TT_weight * TT_pref_ratio +
+                            f_P_weight  * m_tT_weight * tT_pref_ratio / 2.0 +
+                            f_PT_weight * m_tt_weight * tt_pref_ratio;
+      next_pop.female_Ptt = f_Pt_weight * m_tT_weight * tT_pref_ratio / 2.0 +
+                            f_Pt_weight * m_tt_weight * tt_pref_ratio;
 
       // Clean up results.
       next_pop.Normalize();
@@ -130,8 +136,8 @@ struct pop_values {
 int main() {
   pop_values pop;
 
-  for (size_t i = 0; i < 10000; i++) {    
-    pop.MinPrint(i);
+  for (size_t i = 0; i < 5000000; i++) {    
+    if (i % 1000 == 0) pop.MinPrint(i);
     pop.Run();
   }
   std::cout << "Final:\n";
