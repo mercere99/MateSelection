@@ -1,6 +1,9 @@
 #include <iostream>
 #include <math.h>
 
+// Define to quickly print variable status as needed.
+#define PRINT_VAR(X) std::cout << #X << " = " << X << std::endl
+
 struct pop_values {
   // Females without preference
   double female_pTT = 1.0; // f1
@@ -123,10 +126,13 @@ struct pop_values {
       double m_tt_weight = male_tt * m_tt_fit;
 
       // Determine how preferences help...
-      double ave_pref_level = pref_level * male_TT + pref_level_het * male_tT + male_tt;
-      double TT_pref_ratio = pref_level / ave_pref_level;
-      double tT_pref_ratio = pref_level_het / ave_pref_level;
-      double tt_pref_ratio = 1.0 / ave_pref_level;
+      double total_m_weight = m_TT_weight + m_tT_weight + m_tt_weight;
+      double total_pref_weight = pref_level * m_TT_weight + pref_level_het * m_tT_weight + m_tt_weight;
+      double pref_scale = total_m_weight / total_pref_weight;
+
+      double TT_pref_ratio = pref_level * pref_scale;
+      double tT_pref_ratio = pref_level_het * pref_scale;
+      double tt_pref_ratio = 1.0 * pref_scale;
 
       // Determine weight of each female in the next population.
       double next_f_pTT = f_pT_weight * m_TT_weight + 
@@ -170,6 +176,7 @@ struct pop_values {
       next_pop.female_Ptt = next_f_pTT * prob_ptt_mut + next_f_PTT * prob_xtt_mut +
                             next_f_ptT * prob_ptx_mut + next_f_PtT * prob_xtx_mut + 
                             next_f_ptt * prob_pxx_mut + next_f_Ptt * prob_xxx_mut;
+
 
       // Clean up results.
       next_pop.Normalize();
